@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ranking Pages at Risk of Losing Search Visibility: A Decision-Support Study</title>
+<meta name="description" content="A leakage-safe, client-holdout study of whether a model beats a simple rule at ranking pages likely to lose search impressions next month.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--text:#14181D;--bg:#F6F8FA;--main:#2F5D8A;--accent:#E08A1E;--line:rgba(20,24,29,.12)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:400 17px/1.6 'IBM Plex Sans',system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:64px 20px 96px}
+h1{font-size:40px;line-height:1.15;font-weight:600;margin:8px 0 16px}
+h2{font-size:28px;line-height:1.2;font-weight:600;margin:64px 0 16px;padding-top:24px;border-top:1px solid var(--line)}
+h3{font-size:20px;font-weight:600;margin:32px 0 8px}
+p,ul,ol{margin:0 0 16px}
+li{margin-bottom:8px}
+a{color:var(--main);text-decoration:underline}
+a:hover{color:var(--text)}
+.label{font-size:14px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--main)}
+.meta{color:var(--main);font-size:15px}
+.abstract{border-left:4px solid var(--accent);padding:4px 0 4px 20px;margin:32px 0}
+.wrap{overflow-x:auto;margin:24px 0}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;background:rgba(47,93,138,.08)}
+td.n,th.n{text-align:right;white-space:nowrap}
+figure{margin:40px 0}
+figure img{width:100%;height:auto;display:block;border:0}
+figcaption{font-size:14px;margin-top:8px}
+code{font-family:ui-monospace,Menlo,monospace;font-size:.9em;background:rgba(20,24,29,.06);padding:1px 5px}
+@media(max-width:600px){h1{font-size:32px}h2{font-size:24px}main{padding:40px 16px 64px}}
+</style>
+</head>
+<body>
+<main>
+
+<p class="label">Research paper · FlyRank ML Internship capstone</p>
+<h1>Ranking Pages at Risk of Losing Search Visibility: A Decision-Support Study</h1>
+<p class="meta">Haseeb · 2026 · Content Opportunity Scoring lane</p>
+
+<div class="abstract">
+<p class="label">Abstract</p>
+<p>Content teams can review only a few pages each month, so they need to know which pages are most likely to lose search visibility next. This study asks whether a random forest ranks such pages better than a simple hand-written rule (stale and low CTR). Using anonymized search data for 16,632 pages from 27 clients, features from February 2026 predict a decline label built from March 2026, evaluated with client-holdout and out-of-fold validation. A single holdout split favoured the rule, but 91% of its test pages came from one client, and ranking within each client gave near-chance skill for both methods (mean AUC about 0.55). A review queue built from a blend of both signals contained pages that declined 1.4 times as often as pages overall (23.4% vs 16.4%), a directional result to be treated as decision support, not prediction.</p>
+</div>
+
+<h2>1. Introduction</h2>
+<p><strong>Decision supported.</strong> A content team can review a limited number of pages per month. A ranked list of pages most at risk of declining tells them where to look first.</p>
+<p><strong>Question.</strong> Among visible pages, which are most likely to lose search visibility in the following month, and can a simple model rank them better than a hand-written staleness-and-CTR rule?</p>
+<p><strong>Framing.</strong> This is decision-support ranking. It makes no causal claim that refreshing a page will help it, and no claim about how Google's ranking works.</p>
+
+<h2>2. Data</h2>
+<ul>
+<li><strong>Release:</strong> the FlyRank ML Internship warehouse (<code>FlyRank/internship-warehouse</code> on Hugging Face), queried with DuckDB.</li>
+<li><strong>Tables:</strong> <code>fact_content_daily_performance</code> (daily search metrics) joined with <code>dim_content</code> (page metadata) on a hashed content ID.</li>
+<li><strong>Windows:</strong> features from February 2026, label from March 2026. June 2026 was kept sealed and not used.</li>
+<li><strong>Sample:</strong> 16,632 pages from 27 clients; 16.4% met the decline definition.</li>
+<li><strong>Excluded:</strong> rows without search data; pages under 100 impressions in February; pages whose recorded update date falls after the feature window; and GA4 fields, because coverage was sparse.</li>
+<li><strong>Public-safe:</strong> only hashed IDs and aggregates are used. Clients appear as anonymous letters. No client names, URLs or queries appear anywhere.</li>
+</ul>
+
+<h2>3. Methodology</h2>
+<h3>Label</h3>
+<p>A page is <em>declined</em> if its March impressions are below 70% of its February impressions. The label uses only the future window.</p>
+<h3>Features (all from February or earlier)</h3>
+<p>Impressions, clicks, CTR, average position, days visible, word count, days since last update, page age and content type.</p>
+<h3>Baseline</h3>
+<p>A rule with no labels and no model: rank pages higher when they are stale and have low CTR compared with pages at a similar position.</p>
+<h3>Models</h3>
+<p>A random forest on the raw features, a second forest on client-relative features (each value ranked within its own client), and a fixed 50/50 rank blend of the baseline and the forest. The blend weights were set in advance, not tuned on labels.</p>
+<h3>Validation</h3>
+<ol>
+<li><strong>Client-holdout split:</strong> all pages of a client fall entirely in train or test (18 train clients, 9 test clients, zero overlap).</li>
+<li><strong>Out-of-fold, within-client:</strong> five-fold grouped cross-validation so every page is scored by a model that never saw its client. Ranking skill is then measured as ROC AUC inside each client with at least 100 pages and 10 pages of each class (8 clients).</li>
+</ol>
+<h3>Leakage checks</h3>
+<p>No March data in the features, no product decision flags, and no page whose update date falls after the feature window.</p>
+
+<h2>4. Results</h2>
+<p>The forest did not beat the simple rule, and most of the apparent skill in the first table came from which client a page belongs to.</p>
+<h3>Table A: single client-holdout split (7,922 test pages, base rate 0.157)</h3>
+<div class="wrap"><table>
+<tr><th>Method</th><th class="n">ROC AUC</th><th class="n">Precision@50</th><th class="n">Precision@100</th></tr>
+<tr><td>Baseline rule (stale + low CTR)</td><td class="n">0.582</td><td class="n">0.50</td><td class="n">0.38</td></tr>
+<tr><td>Random forest v1 (raw features)</td><td class="n">0.566</td><td class="n">0.10</td><td class="n">0.13</td></tr>
+<tr><td>Random forest v2 (client-relative)</td><td class="n">0.489</td><td class="n">0.06</td><td class="n">0.13</td></tr>
+</table></div>
+<p><strong>Why Table A is misleading.</strong> One client made up 91% of the test pages. The rule's top 50 held 32 pages from a single client whose decline rate (31%) was about double the average. Staleness is constant within a client, so the rule ranked clients, not pages.</p>
+<h3>Table B: within-client ranking, out-of-fold (8 clients)</h3>
+<div class="wrap"><table>
+<tr><th>Method</th><th class="n">Mean AUC</th><th class="n">Clients above chance</th></tr>
+<tr><td>Baseline rule</td><td class="n">0.556</td><td class="n">7 of 8</td></tr>
+<tr><td>Random forest</td><td class="n">0.549</td><td class="n">7 of 8</td></tr>
+<tr><td>Blend (50/50)</td><td class="n">0.566</td><td class="n">n/a</td></tr>
+</table></div>
+<p>Chance is 0.5. Both methods sit only slightly above it and are effectively tied. The blend's gain of about 0.01 is inside the noise.</p>
+<figure><img src="figures/fig1_within_client_auc.png" alt="Bar chart of ROC AUC within each client for the baseline, forest and blend, with a chance line at 0.5"><figcaption>Figure 1. Ranking skill within each client (out-of-fold).</figcaption></figure>
+<figure><img src="figures/fig2_client_concentration.png" alt="Bar chart showing a few clients hold most pages"><figcaption>Figure 2. Two clients hold about 78% of all pages.</figcaption></figure>
+
+<h2>5. Limitations and honest framing</h2>
+<ul>
+<li><strong>Weak signal.</strong> Within-client AUC is about 0.55, barely above chance. Rankings are decision-support hints, not reliable predictions.</li>
+<li><strong>Proxy label.</strong> A drop below 70% of February impressions can reflect seasonality, consolidation with another page or tracking noise, not only a real decline.</li>
+<li><strong>Survivorship.</strong> Only pages present in both months are kept, so pages that lost all visibility are missing.</li>
+<li><strong>Staleness is client-level.</strong> The page table stores each page's latest update date, so days-since-update is the same for every page in a client.</li>
+<li><strong>Concentrated data.</strong> Two clients hold about 78% of pages, and only 8 clients had enough pages for within-client testing.</li>
+<li><strong>One window pair.</strong> No check across other months, and the sealed June test month was not used.</li>
+<li><strong>Observational only.</strong> Nothing here shows that refreshing a page causes recovery or explains how Google ranks pages.</li>
+</ul>
+
+<h2>6. Ranked recommendations</h2>
+<p>The review queue takes the top 10% of pages inside each client by the blended score, so no single client can fill it. It holds 1,679 pages, ordered by February impressions so reviewers see the most exposed pages first. In this data, <strong>23.4%</strong> of queued pages declined next month, against <strong>16.4%</strong> overall (about 1.4 times). This is directional: pages within a client are correlated, and the underlying signal is weak.</p>
+<div class="wrap"><table>
+<tr><th>Reason code</th><th class="n">Pages</th><th class="n">Declined</th><th>Suggested action</th></tr>
+<tr><td><code>high_visibility_low_ctr</code></td><td class="n">84</td><td class="n">44.0%</td><td>Review title and meta description. Lead to test: small sample, likely from few clients.</td></tr>
+<tr><td><code>patchy_visibility</code></td><td class="n">188</td><td class="n">29.8%</td><td>Monitor; check for consolidation or indexing problems.</td></tr>
+<tr><td><code>model_flagged_risk</code></td><td class="n">1,327</td><td class="n">21.6%</td><td>Monitor and review at the next refresh cycle. No specific cause identified.</td></tr>
+<tr><td><code>deep_position</code></td><td class="n">80</td><td class="n">17.5%</td><td>Review depth and intent match. Declined at about the base rate, so this data does not support the action.</td></tr>
+</table></div>
+<figure><img src="figures/fig3_queue_decline_rate.png" alt="Bar chart of decline rate for all pages, the review queue and each reason code"><figcaption>Figure 3. Share of pages that declined next month, overall and by reason code.</figcaption></figure>
+<p>Use this as decision support: it suggests where a reviewer's limited time is more likely to find a declining page than picking at random. It does not say that acting on a page will recover it.</p>
+
+<h2>7. Reproducibility</h2>
+<ul>
+<li>Repository: <a href="https://github.com/codingsheep17/flyrank-ml-internship">github.com/codingsheep17/flyrank-ml-internship</a></li>
+<li>Capstone notebook: <a href="https://github.com/codingsheep17/flyrank-ml-internship/blob/main/work/notebooks/capstone.ipynb"><code>work/notebooks/capstone.ipynb</code></a></li>
+<li>Earlier assignments (data contract, baseline score) are in the same <code>work/notebooks/</code> folder.</li>
+<li>Access to the warehouse release needs a free Hugging Face account and a read token; raw data and CSV outputs are not committed.</li>
+</ul>
+
+<h2>8. Acknowledgments and data credit</h2>
+<p>Built on the FlyRank ML Internship dataset, from <a href="https://flyrank.ai">FlyRank</a>. Thanks to the FlyRank internship team for the data release and curriculum.</p>
+
+</main>
+</body>
+</html>
